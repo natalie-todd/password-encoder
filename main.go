@@ -1,33 +1,18 @@
 package main
 
 import (
-	"fmt"
 	"github.com/gorilla/mux"
 	"net/http"
+	"password-encoder/handlers"
 )
 
 func main() {
-	fmt.Println("Hello world")
-
 	r := mux.NewRouter()
+	h := handlers.InitializeHandler()
 
-	r.HandleFunc("/hash", createHash).Methods(http.MethodPost)
-	r.HandleFunc("/hash/{id}", getHash).Methods(http.MethodGet)
-	r.HandleFunc("/stats", getStats).Methods(http.MethodGet)
+	r.HandleFunc("/hash", h.CreateHash).Methods(http.MethodPost)
+	r.HandleFunc("/hash/{id}", h.GetHash).Methods(http.MethodGet)
+	r.HandleFunc("/stats", h.GetStats).Methods(http.MethodGet)
 
 	http.ListenAndServe(":8080", r)
 }
-
-func createHash(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("create hash and return request #")
-}
-
-func getHash(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("get hash")
-}
-
-func getStats(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(`get stats {"total": "number of requests made", "average": "average of time taken to process the requests"}`)
-}
-
-// must track id, hashedpw, average time to process the requests
