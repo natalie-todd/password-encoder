@@ -13,10 +13,10 @@ import (
 const password = "password"
 
 type Handler struct {
-	service *service.Service
+	service service.Servicer
 }
 
-func InitializeHandler(service *service.Service) *Handler {
+func InitializeHandler(service service.Servicer) *Handler {
 	return &Handler{
 		service: service,
 	}
