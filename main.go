@@ -1,18 +1,26 @@
 package main
 
 import (
-	"github.com/gorilla/mux"
 	"net/http"
-	"password-encoder/handlers"
+	"os"
+	"os/signal"
+	"password-encoder/server"
+	"password-encoder/service"
 )
 
 func main() {
-	r := mux.NewRouter()
-	h := handlers.InitializeHandler()
+	s := service.InitializeService()
+	h := server.InitializeHandler(s)
+	r := server.NewRouter(h)
+	r.InitializeRoutes()
 
-	r.HandleFunc("/hash", h.CreateHash).Methods(http.MethodPost)
-	r.HandleFunc("/hash/{id}", h.GetHash).Methods(http.MethodGet)
-	r.HandleFunc("/stats", h.GetStats).Methods(http.MethodGet)
+	server := http.Server{
+		Addr:    ":8080",
+		Handler: r,
+	}
 
-	http.ListenAndServe(":8080", r)
+	stop := make(chan os.Signal)
+	signal.Notify(stop, os.Interrupt)
+
+	server.ListenAndServe()
 }
