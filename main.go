@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"password-encoder/server"
 	"password-encoder/service"
+	"syscall"
 )
 
 func main() {
@@ -19,8 +22,20 @@ func main() {
 		Handler: r,
 	}
 
-	stop := make(chan os.Signal)
-	signal.Notify(stop, os.Interrupt)
+	termChan := make(chan os.Signal)
+	signal.Notify(termChan, syscall.SIGINT)
 
-	server.ListenAndServe()
+	go func() {
+		<-termChan // Blocks here until interrupted
+		log.Print("SIGTERM received. Shutdown process initiated\n")
+		server.Shutdown(context.Background())
+	}()
+
+	if err := server.ListenAndServe(); err != nil {
+		if err.Error() != "http: Server closed" {
+			log.Printf("HTTP server closed with: %v\n", err)
+		}
+		log.Printf("HTTP server shut down")
+	}
+
 }
