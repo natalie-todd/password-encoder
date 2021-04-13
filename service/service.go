@@ -3,6 +3,7 @@ package service
 import (
 	"crypto/sha512"
 	"encoding/base64"
+	"sync"
 	"time"
 )
 
@@ -14,18 +15,24 @@ type Stats struct {
 	Average int64 `json:"average"`
 }
 
-type Service struct {}
+type Service struct {
+	wg *sync.WaitGroup
+}
 
-func InitializeService() *Service {
-	return &Service{}
+func InitializeService(wg *sync.WaitGroup) *Service {
+	return &Service{
+		wg: wg,
+	}
 }
 
 func (s *Service) CalculateHashAndDuration(startTime time.Time, fiveSecTimer *time.Timer, password string) {
+	hashedPasswords = append(hashedPasswords, "")
 	go func() {
 		<-fiveSecTimer.C
 		s.hashPassword(password)
 		duration := time.Since(startTime)
 		durations = append(durations, duration)
+		s.wg.Done()
 	}()
 }
 
@@ -51,5 +58,5 @@ func (s *Service) CalculateStats() *Stats {
 func (s *Service) hashPassword(password string) () {
 	pwBytes := []byte(password)
 	sha := sha512.Sum512(pwBytes)
-	hashedPasswords = append(hashedPasswords, base64.StdEncoding.EncodeToString(sha[:]))
+	hashedPasswords[len(hashedPasswords)-1] = base64.StdEncoding.EncodeToString(sha[:])
 }

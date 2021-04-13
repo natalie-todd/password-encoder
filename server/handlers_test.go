@@ -13,12 +13,12 @@ import (
 	"password-encoder/service"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
 
 func TestHandler_CreateHash(t *testing.T) {
-
 	start := time.Now()
 
 	type args struct {
@@ -61,9 +61,10 @@ func TestHandler_CreateHash(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		var wg sync.WaitGroup
 		mockController := gomock.NewController(t)
 		mockService := mocks.NewMockServicer(mockController)
-		testHandler := InitializeHandler(mockService)
+		testHandler := InitializeHandler(mockService, &wg)
 
 		testRouter := mux.NewRouter()
 		testRouter.HandleFunc(tt.args.URL, testHandler.CreateHash).Methods(http.MethodPost)
@@ -128,9 +129,10 @@ func TestHandler_GetHash(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		var wg sync.WaitGroup
 		mockController := gomock.NewController(t)
 		mockService := mocks.NewMockServicer(mockController)
-		testHandler := InitializeHandler(mockService)
+		testHandler := InitializeHandler(mockService, &wg)
 
 		testRouter := mux.NewRouter()
 		testRouter.HandleFunc(fmt.Sprintf("%s/{id}", tt.args.URL), testHandler.GetHash).Methods(http.MethodGet)
@@ -182,9 +184,10 @@ func TestHandler_CalculateStats(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		var wg sync.WaitGroup
 		mockController := gomock.NewController(t)
 		mockService := mocks.NewMockServicer(mockController)
-		testHandler := InitializeHandler(mockService)
+		testHandler := InitializeHandler(mockService, &wg)
 
 		testRouter := mux.NewRouter()
 		testRouter.HandleFunc(tt.args.URL, testHandler.GetStats).Methods(http.MethodGet)

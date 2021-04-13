@@ -8,12 +8,14 @@ import (
 	"os/signal"
 	"password-encoder/server"
 	"password-encoder/service"
+	"sync"
 	"syscall"
 )
 
 func main() {
-	s := service.InitializeService()
-	h := server.InitializeHandler(s)
+	var wg sync.WaitGroup
+	s := service.InitializeService(&wg)
+	h := server.InitializeHandler(s, &wg)
 	r := server.NewRouter(h)
 	r.InitializeRoutes()
 
@@ -26,8 +28,8 @@ func main() {
 	signal.Notify(termChan, syscall.SIGINT)
 
 	go func() {
-		<-termChan // Blocks here until interrupted
-		log.Print("SIGTERM received. Shutdown process initiated\n")
+		<-termChan
+		log.Print("SIGTERM received. Shutdown process initiated")
 		server.Shutdown(context.Background())
 	}()
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"password-encoder/service"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -14,16 +15,19 @@ const password = "password"
 
 type Handler struct {
 	service service.Servicer
+	wg      *sync.WaitGroup
 }
 
-func InitializeHandler(service service.Servicer) *Handler {
+func InitializeHandler(service service.Servicer, wg *sync.WaitGroup) *Handler {
 	return &Handler{
 		service: service,
+		wg:      wg,
 	}
 }
 
 func (h *Handler) CreateHash(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
+	h.wg.Add(1)
 	fiveSecTimer := time.NewTimer(5 * time.Second)
 
 	if err := r.ParseForm(); err != nil {
@@ -38,7 +42,7 @@ func (h *Handler) CreateHash(w http.ResponseWriter, r *http.Request) {
 
 	h.service.CalculateHashAndDuration(startTime, fiveSecTimer, password)
 
-	if err := json.NewEncoder(w).Encode(len(h.service.GetHashedPasswords()) + 1); err != nil {
+	if err := json.NewEncoder(w).Encode(len(h.service.GetHashedPasswords())); err != nil {
 		http.Error(w, "failed to encode json response", http.StatusInternalServerError)
 		return
 	}
@@ -67,6 +71,7 @@ func (h *Handler) GetStats(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Shutdown(w http.ResponseWriter, r *http.Request) {
+	h.wg.Wait()
 	if err := syscall.Kill(syscall.Getpid(), syscall.SIGINT); err != nil {
 		http.Error(w, "failed to execute shutdown signal", http.StatusInternalServerError)
 	}
