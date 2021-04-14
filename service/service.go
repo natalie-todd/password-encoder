@@ -36,7 +36,6 @@ func (s *Service) CalculateHashAndDuration(startTime time.Time, fiveSecTimer *ti
 	}()
 }
 
-// TODO: consider putting this method on the passwords after moving them to a struct
 func (s *Service) GetHashedPasswords() []string {
 	return hashedPasswords
 }

@@ -9,5 +9,3 @@ type Servicer interface {
 
 	CalculateStats() *Stats
 }
-
-//mockgen -source=service/service_interface.go

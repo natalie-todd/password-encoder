@@ -76,7 +76,7 @@ func TestHandler_CreateHash(t *testing.T) {
 			r := httptest.NewRequest(http.MethodPost, tt.args.URL, strings.NewReader(data.Encode()))
 			r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			r.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
-			//TODO: remove gomock.Any()
+
 			mockService.EXPECT().CalculateHashAndDuration(gomock.Any(), gomock.Any(), tt.args.passWord).Return().Times(tt.mox.calls)
 			mockService.EXPECT().GetHashedPasswords().Return(tt.mox.hashedPasswords).Times(tt.mox.calls)
 

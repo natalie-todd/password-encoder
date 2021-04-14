@@ -29,15 +29,14 @@ func main() {
 
 	go func() {
 		<-termChan
-		log.Print("SIGTERM received. Shutdown process initiated")
+		log.Print("SIGTERM received. Shutting down server.")
 		server.Shutdown(context.Background())
 	}()
 
 	if err := server.ListenAndServe(); err != nil {
 		if err.Error() != "http: Server closed" {
-			log.Printf("HTTP server closed with: %v\n", err)
+			log.Printf("HTTP server closed")
 		}
 		log.Printf("HTTP server shut down")
 	}
-
 }
