@@ -2,11 +2,12 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/gorilla/mux"
 	"net/http"
 	"password-encoder/service"
 	"strconv"
+	"sync"
+	"syscall"
 	"time"
 )
 
@@ -14,45 +15,64 @@ const password = "password"
 
 type Handler struct {
 	service service.Servicer
+	wg      *sync.WaitGroup
 }
 
-func InitializeHandler(service service.Servicer) *Handler {
+func InitializeHandler(service service.Servicer, wg *sync.WaitGroup) *Handler {
 	return &Handler{
 		service: service,
+		wg:      wg,
 	}
 }
 
 func (h *Handler) CreateHash(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
+	h.wg.Add(1)
 	fiveSecTimer := time.NewTimer(5 * time.Second)
 
 	if err := r.ParseForm(); err != nil {
-		fmt.Errorf("500 failed to parse form - this could probably be a better error")
+		http.Error(w, "failed to parse form field", http.StatusInternalServerError)
+		return
 	}
 	password := r.PostForm.Get(password)
+	if password == "" {
+		http.Error(w, "empty password", http.StatusBadRequest)
+		return
+	}
 
 	h.service.CalculateHashAndDuration(startTime, fiveSecTimer, password)
 
-	json.NewEncoder(w).Encode(len(h.service.GetHashedPasswords()) + 1)
+	if err := json.NewEncoder(w).Encode(len(h.service.GetHashedPasswords())); err != nil {
+		http.Error(w, "failed to encode json response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *Handler) GetHash(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	intID, err := strconv.Atoi(id)
 	if err != nil {
-		fmt.Errorf("failed to convert path param to int")
+		http.Error(w, "failed to convert ID to int", http.StatusBadRequest)
+		return
 	}
 
-	json.NewEncoder(w).Encode(h.service.GetHashedPasswords()[intID-1])
+	if err := json.NewEncoder(w).Encode(h.service.GetHashedPasswords()[intID-1]); err != nil {
+		http.Error(w, "failed to encode hashed password", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *Handler) GetStats(w http.ResponseWriter, r *http.Request) {
 	stats := h.service.CalculateStats()
-	json.NewEncoder(w).Encode(stats)
+	if err := json.NewEncoder(w).Encode(stats); err != nil {
+		http.Error(w, "failed to encode stats", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *Handler) Shutdown(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("shutdown")
-	ctx := (*r).Context()
-	ctx.Done()
+	h.wg.Wait()
+	if err := syscall.Kill(syscall.Getpid(), syscall.SIGINT); err != nil {
+		http.Error(w, "failed to execute shutdown signal", http.StatusInternalServerError)
+	}
 }

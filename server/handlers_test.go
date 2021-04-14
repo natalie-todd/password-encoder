@@ -13,12 +13,12 @@ import (
 	"password-encoder/service"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
 
 func TestHandler_CreateHash(t *testing.T) {
-
 	start := time.Now()
 
 	type args struct {
@@ -29,6 +29,7 @@ func TestHandler_CreateHash(t *testing.T) {
 	}
 	type mox struct {
 		hashedPasswords []string
+		calls           int
 	}
 	type expected struct {
 		response   int
@@ -41,22 +42,29 @@ func TestHandler_CreateHash(t *testing.T) {
 		expected expected
 	}{
 		{
-			name:     "Single Password 200 Success Case",
+			name:     "Single Password 200 Success",
 			args:     args{URL: "/hash", passWord: "angryMonkey", startTime: start, fiveSecTimer: time.NewTimer(5 * time.Second)},
-			mox:      mox{hashedPasswords: []string{"ZEHhWB65gUlzdVwtDQArEyx+KVLzp/aTaRaPlBzYRIFj6vjFdqEb0Q5B8zVKCZ0vKbZPZklJz0Fd7su2A+gf7Q=="}},
-			expected: expected{response: 1, httpStatus: 200},
+			mox:      mox{hashedPasswords: []string{"ZEHhWB65gUlzdVwtDQArEyx+KVLzp/aTaRaPlBzYRIFj6vjFdqEb0Q5B8zVKCZ0vKbZPZklJz0Fd7su2A+gf7Q=="}, calls: 1},
+			expected: expected{response: 1, httpStatus: http.StatusOK},
 		},
 		{
-			name:     "Multiple Passwords 200 Success Case",
+			name:     "Multiple Passwords 200 Success",
 			args:     args{URL: "/hash", passWord: "angryMonkey", startTime: start, fiveSecTimer: time.NewTimer(5 * time.Second)},
-			mox:      mox{hashedPasswords: []string{"hash1", "hash2", "hash3"}},
-			expected: expected{response: 4, httpStatus: 200},
+			mox:      mox{hashedPasswords: []string{"hash1", "hash2", "hash3"}, calls: 1},
+			expected: expected{response: 4, httpStatus: http.StatusOK},
+		},
+		{
+			name:     "400 Bad Request",
+			args:     args{URL: "/hash", passWord: ""},
+			mox:      mox{calls: 0},
+			expected: expected{response: 0, httpStatus: http.StatusBadRequest},
 		},
 	}
 	for _, tt := range tests {
+		var wg sync.WaitGroup
 		mockController := gomock.NewController(t)
 		mockService := mocks.NewMockServicer(mockController)
-		testHandler := InitializeHandler(mockService)
+		testHandler := InitializeHandler(mockService, &wg)
 
 		testRouter := mux.NewRouter()
 		testRouter.HandleFunc(tt.args.URL, testHandler.CreateHash).Methods(http.MethodPost)
@@ -68,9 +76,9 @@ func TestHandler_CreateHash(t *testing.T) {
 			r := httptest.NewRequest(http.MethodPost, tt.args.URL, strings.NewReader(data.Encode()))
 			r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 			r.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
-			//TODO: remove gomock.Any()
-			mockService.EXPECT().CalculateHashAndDuration(gomock.Any(), gomock.Any(), tt.args.passWord).Return().Times(1)
-			mockService.EXPECT().GetHashedPasswords().Return(tt.mox.hashedPasswords).Times(1)
+
+			mockService.EXPECT().CalculateHashAndDuration(gomock.Any(), gomock.Any(), tt.args.passWord).Return().Times(tt.mox.calls)
+			mockService.EXPECT().GetHashedPasswords().Return(tt.mox.hashedPasswords).Times(tt.mox.calls)
 
 			testRouter.ServeHTTP(responseWriter, r)
 			assert.Equal(t, tt.expected.httpStatus, responseWriter.Code)
@@ -85,10 +93,11 @@ func TestHandler_CreateHash(t *testing.T) {
 func TestHandler_GetHash(t *testing.T) {
 	type args struct {
 		URL        string
-		queryParam int
+		queryParam string
 	}
 	type mox struct {
 		hashedPasswords []string
+		calls           int
 	}
 	type expected struct {
 		response   string
@@ -101,30 +110,38 @@ func TestHandler_GetHash(t *testing.T) {
 		expected expected
 	}{
 		{
-			name:     "First Hash 200 Success Case",
-			args:     args{URL: "/hash", queryParam: 1},
-			mox:      mox{hashedPasswords: []string{"ZEHhWB65gUlzdVwtDQArEyx+KVLzp/aTaRaPlBzYRIFj6vjFdqEb0Q5B8zVKCZ0vKbZPZklJz0Fd7su2A+gf7Q=="}},
-			expected: expected{response: "ZEHhWB65gUlzdVwtDQArEyx+KVLzp/aTaRaPlBzYRIFj6vjFdqEb0Q5B8zVKCZ0vKbZPZklJz0Fd7su2A+gf7Q==", httpStatus: 200},
+			name:     "First Hash 200 Success",
+			args:     args{URL: "/hash", queryParam: "1"},
+			mox:      mox{hashedPasswords: []string{"ZEHhWB65gUlzdVwtDQArEyx+KVLzp/aTaRaPlBzYRIFj6vjFdqEb0Q5B8zVKCZ0vKbZPZklJz0Fd7su2A+gf7Q=="}, calls:1},
+			expected: expected{response: "ZEHhWB65gUlzdVwtDQArEyx+KVLzp/aTaRaPlBzYRIFj6vjFdqEb0Q5B8zVKCZ0vKbZPZklJz0Fd7su2A+gf7Q==", httpStatus: http.StatusOK},
 		},
 		{
-			name:     "Last Hash 200 Success Case",
-			args:     args{URL: "/hash", queryParam: 3},
-			mox:      mox{hashedPasswords: []string{"hash1", "hash2", "hash3"}},
-			expected: expected{response: "hash3", httpStatus: 200},
+			name:     "Last Hash 200 Success",
+			args:     args{URL: "/hash", queryParam: "3"},
+			mox:      mox{hashedPasswords: []string{"hash1", "hash2", "hash3"}, calls:1},
+			expected: expected{response: "hash3", httpStatus: http.StatusOK},
+		},
+		{
+			name:     "400 Bad Request",
+			args:     args{URL: "/hash", queryParam: "three"},
+			mox:      mox{calls:0},
+			expected: expected{response: "", httpStatus: http.StatusBadRequest},
 		},
 	}
 	for _, tt := range tests {
+		var wg sync.WaitGroup
 		mockController := gomock.NewController(t)
 		mockService := mocks.NewMockServicer(mockController)
-		testHandler := InitializeHandler(mockService)
+		testHandler := InitializeHandler(mockService, &wg)
 
 		testRouter := mux.NewRouter()
 		testRouter.HandleFunc(fmt.Sprintf("%s/{id}", tt.args.URL), testHandler.GetHash).Methods(http.MethodGet)
 
 		t.Run(tt.name, func(t *testing.T) {
 			responseWriter := httptest.NewRecorder()
-			r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("%s/%d", tt.args.URL, tt.args.queryParam), nil)
-			mockService.EXPECT().GetHashedPasswords().Return(tt.mox.hashedPasswords).Times(1)
+			r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("%s/%s", tt.args.URL, tt.args.queryParam), nil)
+
+			mockService.EXPECT().GetHashedPasswords().Return(tt.mox.hashedPasswords).Times(tt.mox.calls)
 
 			testRouter.ServeHTTP(responseWriter, r)
 			assert.Equal(t, tt.expected.httpStatus, responseWriter.Code)
@@ -154,22 +171,23 @@ func TestHandler_CalculateStats(t *testing.T) {
 		expected expected
 	}{
 		{
-			name:     "200 Success Case",
-			args:     args{URL: "/stats"},
-			mox:      mox{stats:&service.Stats{
+			name: "200 Success Case",
+			args: args{URL: "/stats"},
+			mox: mox{stats: &service.Stats{
 				Total:   3,
 				Average: 0,
 			}},
-			expected: expected{response:&service.Stats{
+			expected: expected{response: &service.Stats{
 				Total:   3,
 				Average: 0,
-			}, httpStatus: 200},
+			}, httpStatus: http.StatusOK},
 		},
 	}
 	for _, tt := range tests {
+		var wg sync.WaitGroup
 		mockController := gomock.NewController(t)
 		mockService := mocks.NewMockServicer(mockController)
-		testHandler := InitializeHandler(mockService)
+		testHandler := InitializeHandler(mockService, &wg)
 
 		testRouter := mux.NewRouter()
 		testRouter.HandleFunc(tt.args.URL, testHandler.GetStats).Methods(http.MethodGet)
